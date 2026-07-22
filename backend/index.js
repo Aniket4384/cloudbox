@@ -14,7 +14,7 @@ const dotenv = require("dotenv")
 
 dotenv.config()
 
-
+console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
 server.use(cors({
     origin: process.env.FRONTEND_URL,
     credentials:true
