@@ -28,7 +28,7 @@ import {
 // Import your logout action (adjust path)
 import { logout } from "../redux/slices/authSlice"; // example
 
-const API_BASE_URL = "http://localhost:3000";
+const API_BASE_URL =  import.meta.env.VITE_BACKEND_URL;
 
 export default function Dashboard() {
   const dispatch = useDispatch();

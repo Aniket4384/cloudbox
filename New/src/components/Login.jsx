@@ -5,6 +5,7 @@ import { setUser } from "../redux/slices/authSlice";
 import { useNavigate } from "react-router-dom";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "../../firebase";
+const API_BASE_URL =  import.meta.env.VITE_BACKEND_URL
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -54,7 +55,7 @@ const Login = () => {
     try {
       // ✅ axios POST request
       const response = await axios.post(
-        "http://localhost:3000/auth/login",
+         `${API_BASE_URL}/auth/login`,
         {
           email,
           password,
@@ -96,7 +97,7 @@ const Login = () => {
        const result = await signInWithPopup(auth,provider)
        
        try {
-         const {data} = await axios.post("http://localhost:3000/auth/googleAuth", {
+         const {data} = await axios.post(`${API_BASE_URL}/auth/googleAuth`, {
            name: result.user.displayName,
            email: result.user.email
          }, {withCredentials:true})
