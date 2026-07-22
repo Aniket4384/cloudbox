@@ -5,7 +5,7 @@ import {getAuth} from "firebase/auth"
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_API_KEY,
   authDomain: import.meta.env.authDomain,
-  projectId: import.meta.env.projectId,
+  projectId:  "cloud-app-cc93a",
   storageBucket: import.meta.env.storageBucket,
   messagingSenderId:import.meta.env.messagingSenderId,
   appId: import.meta.env.appId,
