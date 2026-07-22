@@ -4,12 +4,12 @@ import { getAnalytics } from "firebase/analytics";
 import {getAuth} from "firebase/auth"
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_API_KEY,
-  authDomain: "cloud-app-cc93a.firebaseapp.com",
-  projectId: "cloud-app-cc93a",
-  storageBucket: "cloud-app-cc93a.firebasestorage.app",
-  messagingSenderId: "262717251602",
-  appId: "1:262717251602:web:948d27698b0b94a19378cb",
-  measurementId: "G-WGTKCF6WY5"
+  authDomain: import.meta.env.authDomain,
+  projectId: import.meta.env.projectId,
+  storageBucket: import.meta.env.storageBucket,
+  messagingSenderId:import.meta.env.messagingSenderId,
+  appId: import.meta.env.appId,
+  measurementId: import.meta.env.measurementId,
 };
 
 const app = initializeApp(firebaseConfig);

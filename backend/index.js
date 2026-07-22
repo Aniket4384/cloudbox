@@ -10,9 +10,13 @@ const authMiddleware = require('./middleware/authMiddleware')
 const router = require('./routes/fileRoutes')
 const frouter = require('./routes/folderRoutes')
 
+const dotenv = require("dotenv")
+
+dotenv.config()
+
 
 server.use(cors({
-    origin:"http://localhost:5173",
+    origin: process.env.FRONTEND_URL,
     credentials:true
 }));
 
