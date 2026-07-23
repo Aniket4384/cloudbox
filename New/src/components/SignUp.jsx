@@ -101,7 +101,7 @@ const SignUp = () => {
       }, {withCredentials:true})
       console.log(data)
       dispatch(setUser(data?.user))
-        navigate("/dashboard")
+        navigate("/login")
 
       
     } catch (error) {
