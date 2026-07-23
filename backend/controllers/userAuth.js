@@ -1,5 +1,8 @@
 const bcrypt = require("bcrypt");
-const {signupValidator,loginValidator} = require("../validators/authValidator");
+const {
+  signupValidator,
+  loginValidator,
+} = require("../validators/authValidator");
 const User = require("../models/userModel");
 const jwt = require("jsonwebtoken");
 const register = async (req, res) => {
@@ -73,8 +76,8 @@ const login = async (req, res) => {
 
     res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-       sameSite: "lax",
+      secure: true,
+      sameSite: "none",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -90,58 +93,55 @@ const login = async (req, res) => {
 };
 
 const logout = async (req, res) => {
-    try {
-        res.clearCookie("token", {
-            httpOnly: true,
-            secure: false, // true in production with https
-            sameSite: "strict"
-        });
+  try {
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
-        return res.status(200).json({
-            message: "Logout successful"
-        });
-
-    } catch (error) {
-        return res.status(500).json({
-            message: error.message
-        });
-    }
+    return res.status(200).json({
+      message: "Logout successful",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: error.message,
+    });
+  }
 };
 
-const googleAuth = async(req,res)=>{
+const googleAuth = async (req, res) => {
   try {
-    const{name,email} = req.body
-    let user = await User.findOne({email})
+    const { name, email } = req.body;
+    let user = await User.findOne({ email });
 
-    if(!user){
+    if (!user) {
       user = await User.create({
         name: name,
-        email:email,
-      })
+        email: email,
+      });
     }
 
-     const token = jwt.sign({ id: user._id, email }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ id: user._id, email }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
 
     res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+       httpOnly: true,
+  secure: true,
+  sameSite: "none",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     return res.status(200).json({
       message: "success",
       user,
     });
-
-
   } catch (error) {
     res.status(500).json({
-      message: "google auth error : "+err.message,
+      message: "google auth error : " + err.message,
     });
   }
-
-}
-module.exports = {register,login,logout,googleAuth};
+};
+module.exports = { register, login, logout, googleAuth };
