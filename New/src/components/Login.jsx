@@ -218,7 +218,7 @@ const Login = () => {
           {/* Extra link */}
           <p className="text-center text-xs text-gray-500 mt-2 cursor-pointer">
             Don't have an account?{" "}
-            <a href="#" className="text-blue-600 hover:underline">
+            <a href="/login" className="text-blue-600 hover:underline">
               Sign up
             </a>
           </p>
