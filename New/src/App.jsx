@@ -9,7 +9,7 @@ import Dashboard from "./components/Dashboard";
 
 import { logout, setUser } from "./redux/slices/authSlice";
 import SharePage from "./components/SharePage";
-
+const API_BASE_URL =  import.meta.env.VITE_BACKEND_URL;
 const App = () => {
   const dispatch = useDispatch();
 
@@ -18,7 +18,7 @@ const App = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await axios.get("http://localhost:3000/me", {
+        const res = await axios.get(`${API_BASE_URL}/me`, {
           withCredentials: true,
         });
 
