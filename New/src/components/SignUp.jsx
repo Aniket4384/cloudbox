@@ -2,19 +2,21 @@ import axios from "axios";
 import React, { useState } from "react";
 import { useDispatch } from 'react-redux';
 import { setUser } from "../redux/slices/authSlice";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "../../firebase";
 
-const API_BASE_URL =  import.meta.env.VITE_BACKEND_URL
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
+
 const SignUp = () => {
-  const dispatch = useDispatch()
-  const navigate = useNavigate()
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
 
   const handleNameChange = (e) => {
     setName(e.target.value);
@@ -54,7 +56,6 @@ const SignUp = () => {
 
     setIsSubmitting(true);
     try {
-     
       const response = await axios.post(`${API_BASE_URL}/auth/register`, {
         name,
         email,
@@ -63,26 +64,21 @@ const SignUp = () => {
 
       console.log("Registration response:", response.data);
 
-      dispatch(setUser(response?.data?.user))
-        navigate("/dashboard")
+      dispatch(setUser(response?.data?.user));
+      navigate("/login");
 
-      // Reset form on success
       setName("");
       setEmail("");
       setPassword("");
       setErrors([]);
     } catch (err) {
-      // Handle error responses
-      console.log(err)
+      console.log(err);
       if (err.response) {
-        // Server responded with error status (4xx, 5xx)
         const serverMessage = err.response.data?.message || "Registration failed. Please try again.";
         setErrors([serverMessage]);
       } else if (err.request) {
-        // Request was made but no response
         setErrors(["Network error. Please check your connection."]);
       } else {
-        // Something else
         setErrors(["An unexpected error occurred."]);
       }
     } finally {
@@ -90,25 +86,39 @@ const SignUp = () => {
     }
   };
 
-  const handleGoogleRegister = async() => {
-    const provider = new GoogleAuthProvider()
-    const result = await signInWithPopup(auth,provider)
-    
+  const handleGoogleRegister = async () => {
+    setGoogleSubmitting(true);
+    setErrors([]);
     try {
-      const {data} = await axios.post(`${API_BASE_URL}/auth/googleAuth`, {
-        name: result.user.displayName,
-        email: result.user.email
-      }, {withCredentials:true})
-      console.log(data)
-      dispatch(setUser(data?.user))
-        navigate("/login")
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
 
-      
-    } catch (error) {
-      console.log(error)
+      const { data } = await axios.post(
+        `${API_BASE_URL}/auth/googleAuth`,
+        {
+          name: result.user.displayName,
+          email: result.user.email,
+        },
+        { withCredentials: true }
+      );
+
+      dispatch(setUser(data.user));
+      navigate("/dashboard");
+    } catch (err) {
+      console.error(err);
+      // Handle Firebase specific errors
+      if (err.code === 'auth/popup-closed-by-user') {
+        setErrors(['Popup closed before completing sign-in.']);
+      } else if (err.code === 'auth/popup-blocked') {
+        setErrors(['Popup was blocked. Please allow popups for this site.']);
+      } else if (err.response) {
+        setErrors([err.response.data?.message || 'Google sign-up failed.']);
+      } else {
+        setErrors(['An unexpected error occurred during Google sign-up.']);
+      }
+    } finally {
+      setGoogleSubmitting(false);
     }
-
-    
   };
 
   return (
@@ -128,7 +138,7 @@ const SignUp = () => {
               onChange={handleNameChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               placeholder="John Doe"
-              disabled={isSubmitting}
+              disabled={isSubmitting || googleSubmitting}
             />
           </div>
 
@@ -140,7 +150,7 @@ const SignUp = () => {
               onChange={handleEmailChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               placeholder="you@example.com"
-              disabled={isSubmitting}
+              disabled={isSubmitting || googleSubmitting}
             />
           </div>
 
@@ -152,7 +162,7 @@ const SignUp = () => {
               onChange={handlePasswordChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               placeholder="••••••••"
-              disabled={isSubmitting}
+              disabled={isSubmitting || googleSubmitting}
             />
             <p className="text-xs text-gray-500 mt-1">At least 6 characters</p>
           </div>
@@ -169,9 +179,9 @@ const SignUp = () => {
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || googleSubmitting}
             className={`w-full bg-blue-600 text-white font-semibold py-2 rounded-lg transition ${
-              isSubmitting ? "opacity-70 cursor-not-allowed" : "hover:bg-blue-700"
+              isSubmitting || googleSubmitting ? "opacity-70 cursor-not-allowed" : "hover:bg-blue-700"
             }`}
           >
             {isSubmitting ? "Creating account..." : "Sign Up"}
@@ -189,7 +199,7 @@ const SignUp = () => {
           <button
             type="button"
             onClick={handleGoogleRegister}
-            disabled={isSubmitting}
+            disabled={isSubmitting || googleSubmitting}
             className="w-full flex items-center justify-center gap-2 border border-gray-300 bg-white text-gray-700 font-medium py-2 rounded-lg hover:bg-gray-50 transition cursor-pointer"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -210,8 +220,16 @@ const SignUp = () => {
                 fill="#EA4335"
               />
             </svg>
-            Sign up with Google
+            {googleSubmitting ? "Signing up..." : "Sign up with Google"}
           </button>
+
+          {/* NEW LINK: Already have an account? Log in */}
+          <div className="text-center text-sm mt-4">
+            <span className="text-gray-600">Already have an account?</span>{' '}
+            <Link to="/login" className="text-blue-600 hover:underline font-medium">
+              Log in
+            </Link>
+          </div>
 
           <p className="text-center text-xs text-gray-500 mt-2">
             By signing up, you agree to our Terms & Privacy Policy

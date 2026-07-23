@@ -25,15 +25,13 @@ import {
   Share2,
   Move,
 } from "lucide-react";
-// Import your logout action (adjust path)
-import { logout } from "../redux/slices/authSlice"; // example
+import { logout } from "../redux/slices/authSlice";
 
-const API_BASE_URL =  import.meta.env.VITE_BACKEND_URL;
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
 export default function Dashboard() {
   const dispatch = useDispatch();
-  // Get user from Redux
-  const { user, loading } = useSelector((state) => state.auth);
+  const { user } = useSelector((state) => state.auth);
 
   // ---------- Local UI state ----------
   const [viewMode, setViewMode] = useState("grid");
@@ -101,15 +99,8 @@ export default function Dashboard() {
   // ---------- Authentication ----------
   const handleLogOut = async () => {
     try {
-      // Call logout API
-      await axios.post(
-        `${API_BASE_URL}/auth/logout`,
-        {},
-        { withCredentials: true }
-      );
-      // Clear Redux state (dispatch logout action)
+      await axios.post(`${API_BASE_URL}/auth/logout`, {}, { withCredentials: true });
       dispatch(logout());
-      // Redirect to login
       window.location.href = "/login";
     } catch (err) {
       console.error("Logout error:", err);
@@ -117,66 +108,82 @@ export default function Dashboard() {
     }
   };
 
-  // ---------- Fetch drive content ----------
+  // ---------- Fetch drive content (updated) ----------
   const fetchDriveContent = useCallback(async () => {
     setIsLoading(true);
+    let files = [];
+    let folders = [];
+
+    // 1) Fetch files – silently ignore 404 / "not found"
     try {
       const filesResponse = await axios.get(`${API_BASE_URL}/file/get-files`, {
         withCredentials: true,
       });
-      const fetchedFiles = filesResponse.data.files || [];
-
-      const mappedFiles = fetchedFiles.map((file) => ({
-        ...file,
-        _id: file._id || file.id,
-        name: file.name || file.originalName || file.fileName || "Unnamed",
-        size: file.size || file.fileSize || 0,
-        mimeType: file.mimeType || file.type || "application/octet-stream",
-        createdAt: file.createdAt || file.uploadedAt || new Date().toISOString(),
-        type: "file",
-        parentFolderId: file.parentFolderId || file.folderId || null,
-      }));
-
-      let mappedFolders = [];
-      try {
-        const foldersResponse = await axios.get(
-          `${API_BASE_URL}/folder/get-folders`,
-          {
-            params: { parentFolder: currentFolderId },
-            withCredentials: true,
-          }
-        );
-        const fetchedFolders = foldersResponse.data.folders || [];
-        mappedFolders = fetchedFolders.map((folder) => ({
-          ...folder,
-          _id: folder._id || folder.id,
-          name: folder.folderName || "Unnamed Folder",
-          createdAt: folder.createdAt || new Date().toISOString(),
-          type: "folder",
-          parentFolderId: folder.parentFolderId || null,
-        }));
-      } catch (folderErr) {
-        console.warn("Folder API not available – skipping folders", folderErr);
-      }
-
-      const filteredFiles = mappedFiles.filter(
-        (file) => file.parentFolderId === currentFolderId
-      );
-
-      const combined = [...mappedFolders, ...filteredFiles];
-      setItems(combined);
-
-      const totalUsed = mappedFiles.reduce((acc, f) => acc + (f.size || 0), 0);
-      setStorageStats((prev) => ({
-        ...prev,
-        used: totalUsed,
-      }));
+      files = filesResponse.data.files || [];
     } catch (err) {
-      console.error("Error fetching drive content:", err);
-      showToast("Failed to load drive content.", "error");
-    } finally {
-      setIsLoading(false);
+      if (err.response?.status === 404 || err.message?.toLowerCase().includes('not found')) {
+        files = [];
+      } else {
+        console.error('Error fetching files:', err);
+        showToast('Failed to load files.', 'error');
+      }
     }
+
+    // 2) Fetch folders – silently ignore 404 / "not found"
+    try {
+      const foldersResponse = await axios.get(
+        `${API_BASE_URL}/folder/get-folders`,
+        {
+          params: { parentFolder: currentFolderId },
+          withCredentials: true,
+        }
+      );
+      folders = foldersResponse.data.folders || [];
+    } catch (err) {
+      if (err.response?.status === 404 || err.message?.toLowerCase().includes('not found')) {
+        folders = [];
+      } else {
+        console.error('Error fetching folders:', err);
+        showToast('Failed to load folders.', 'error');
+      }
+    }
+
+    // 3) Map to unified format
+    const mappedFiles = files.map((file) => ({
+      ...file,
+      _id: file._id || file.id,
+      name: file.name || file.originalName || file.fileName || "Unnamed",
+      size: file.size || file.fileSize || 0,
+      mimeType: file.mimeType || file.type || "application/octet-stream",
+      createdAt: file.createdAt || file.uploadedAt || new Date().toISOString(),
+      type: "file",
+      parentFolderId: file.parentFolderId || file.folderId || null,
+    }));
+
+    const mappedFolders = folders.map((folder) => ({
+      ...folder,
+      _id: folder._id || folder.id,
+      name: folder.folderName || "Unnamed Folder",
+      createdAt: folder.createdAt || new Date().toISOString(),
+      type: "folder",
+      parentFolderId: folder.parentFolderId || null,
+    }));
+
+    // 4) Filter by current folder and combine
+    const filteredFiles = mappedFiles.filter(
+      (file) => file.parentFolderId === currentFolderId
+    );
+    const combined = [...mappedFolders, ...filteredFiles];
+    setItems(combined);
+
+    // 5) Update storage stats
+    const totalUsed = mappedFiles.reduce((acc, f) => acc + (f.size || 0), 0);
+    setStorageStats((prev) => ({
+      ...prev,
+      used: totalUsed,
+    }));
+
+    setIsLoading(false);
   }, [currentFolderId, showToast]);
 
   // ---------- Upload ----------
@@ -539,7 +546,6 @@ export default function Dashboard() {
       if (contextMenu.visible) {
         closeContextMenu();
       }
-      // Close profile dropdown when clicking outside
       if (showProfileDropdown) {
         setShowProfileDropdown(false);
       }
@@ -603,7 +609,6 @@ export default function Dashboard() {
     item.name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Get user initial
   const getUserInitial = () => {
     if (user?.name) return user.name.charAt(0).toUpperCase();
     if (user?.email) return user.email.charAt(0).toUpperCase();
@@ -777,7 +782,7 @@ export default function Dashboard() {
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -787,7 +792,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 relative">
             <button
               onClick={(e) => {
-                e.stopPropagation(); // prevent closing immediately
+                e.stopPropagation();
                 setShowProfileDropdown(!showProfileDropdown);
               }}
               className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-sm border border-indigo-200 hover:bg-indigo-200 transition cursor-pointer"
@@ -800,7 +805,7 @@ export default function Dashboard() {
             {showProfileDropdown && (
               <div
                 className="absolute right-0 top-12 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20"
-                onClick={(e) => e.stopPropagation()} // prevent closing when clicking inside
+                onClick={(e) => e.stopPropagation()}
               >
                 <div className="px-4 py-2 border-b border-gray-100">
                   <p className="text-sm font-medium text-gray-900">
@@ -812,7 +817,7 @@ export default function Dashboard() {
                 </div>
                 <button
                   onClick={handleLogOut}
-                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                   Logout
@@ -859,7 +864,7 @@ export default function Dashboard() {
             <div className="flex bg-gray-200 p-0.5 rounded-lg select-none">
               <button
                 onClick={() => setViewMode("grid")}
-                className={`p-1.5 rounded-md ${
+                className={`p-1.5 rounded-md cursor-pointer ${
                   viewMode === "grid"
                     ? "bg-white text-gray-900 shadow-xs"
                     : "text-gray-500"
@@ -869,7 +874,7 @@ export default function Dashboard() {
               </button>
               <button
                 onClick={() => setViewMode("list")}
-                className={`p-1.5 rounded-md ${
+                className={`p-1.5 rounded-md cursor-pointer ${
                   viewMode === "list"
                     ? "bg-white text-gray-900 shadow-xs"
                     : "text-gray-500"
@@ -1025,11 +1030,9 @@ export default function Dashboard() {
                               getFileIcon(item.mimeType)
                             )}
                             <span
-                              className={
-                                item.type === "folder"
-                                  ? "cursor-pointer hover:text-indigo-600"
-                                  : ""
-                              }
+                              className={`${
+                                item.type === "folder" ? "cursor-pointer hover:text-indigo-600" : ""
+                              }`}
                               onClick={() => {
                                 if (item.type === "folder") {
                                   setFolderPath([
@@ -1109,14 +1112,14 @@ export default function Dashboard() {
         >
           <button
             onClick={() => handleShare(contextMenu.item)}
-            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
           >
             <Share2 className="w-4 h-4" />
             Share
           </button>
           <button
             onClick={() => openMoveModal(contextMenu.item)}
-            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
           >
             <Move className="w-4 h-4" />
             Move to folder
@@ -1136,7 +1139,7 @@ export default function Dashboard() {
               </h3>
               <button
                 onClick={closeMoveModal}
-                className="p-1 rounded hover:bg-gray-100"
+                className="p-1 rounded hover:bg-gray-100 cursor-pointer"
               >
                 <X className="w-5 h-5 text-gray-500" />
               </button>
@@ -1190,7 +1193,7 @@ export default function Dashboard() {
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-4">
               <button
                 onClick={closeMoveModal}
-                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -1200,7 +1203,7 @@ export default function Dashboard() {
                 className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition ${
                   !selectedDestFolderId || loadingFolders
                     ? "bg-gray-300 cursor-not-allowed"
-                    : "bg-indigo-600 hover:bg-indigo-700"
+                    : "bg-indigo-600 hover:bg-indigo-700 cursor-pointer"
                 }`}
               >
                 Move
@@ -1220,7 +1223,7 @@ export default function Dashboard() {
               </h3>
               <button
                 onClick={() => setIsCreateFolderModalOpen(false)}
-                className="p-1 rounded hover:bg-gray-100"
+                className="p-1 rounded hover:bg-gray-100 cursor-pointer"
               >
                 <X className="w-5 h-5 text-gray-500" />
               </button>
@@ -1242,13 +1245,13 @@ export default function Dashboard() {
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-4">
               <button
                 onClick={() => setIsCreateFolderModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateFolderSubmit}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition"
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition cursor-pointer"
               >
                 Create
               </button>
@@ -1267,7 +1270,7 @@ export default function Dashboard() {
               </h3>
               <button
                 onClick={() => setIsRenameModalOpen(false)}
-                className="p-1 rounded hover:bg-gray-100"
+                className="p-1 rounded hover:bg-gray-100 cursor-pointer"
               >
                 <X className="w-5 h-5 text-gray-500" />
               </button>
@@ -1288,13 +1291,13 @@ export default function Dashboard() {
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-4">
               <button
                 onClick={() => setIsRenameModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleRenameSubmit}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition"
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition cursor-pointer"
               >
                 Save
               </button>
@@ -1313,7 +1316,7 @@ export default function Dashboard() {
               </h3>
               <button
                 onClick={() => setIsConfirmModalOpen(false)}
-                className="p-1 rounded hover:bg-gray-100"
+                className="p-1 rounded hover:bg-gray-100 cursor-pointer"
               >
                 <X className="w-5 h-5 text-gray-500" />
               </button>
@@ -1322,13 +1325,13 @@ export default function Dashboard() {
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-4">
               <button
                 onClick={() => setIsConfirmModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmAction}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition"
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition cursor-pointer"
               >
                 Confirm
               </button>
